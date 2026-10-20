@@ -1,0 +1,14 @@
+# Experiment 1: kill ONE of three ledger pods.
+# Hypothesis: the other two pods and the Service absorb it; client error rate stays under 1%.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: kill-one-ledger-pod
+  namespace: payments
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    namespaces: [payments]
+    labelSelectors:
+      app.kubernetes.io/name: ledger

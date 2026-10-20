@@ -1,0 +1,19 @@
+# Experiment 3: add 400 ms of network latency to every ledger pod for 90 seconds.
+# Hypothesis: requests still succeed, but most exceed the 250 ms latency SLO threshold, so the
+# latency SLO would be breached. The load generator's 2 s client timeout should not trip.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: ledger-latency
+  namespace: payments
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces: [payments]
+    labelSelectors:
+      app.kubernetes.io/name: ledger
+  delay:
+    latency: 400ms
+    jitter: 50ms
+  duration: 90s

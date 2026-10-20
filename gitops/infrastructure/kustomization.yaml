@@ -5,4 +5,5 @@ resources:
   - kyverno.yaml
   - argo-rollouts.yaml
   - prometheus.yaml
+  - chaos-mesh.yaml
   - loadgen.yaml

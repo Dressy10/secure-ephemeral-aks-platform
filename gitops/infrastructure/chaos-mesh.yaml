@@ -1,0 +1,43 @@
+# Chaos Mesh controller only. Experiments are NOT synced from git: they are applied on demand by
+# scripts/game-day.ps1 so chaos only ever runs when a human starts it.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: chaos-mesh
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://charts.chaos-mesh.org
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: chaos-mesh
+  namespace: flux-system
+spec:
+  interval: 10m
+  releaseName: chaos-mesh
+  targetNamespace: chaos-mesh
+  install:
+    createNamespace: true
+  chart:
+    spec:
+      chart: chaos-mesh
+      version: 2.8.5
+      sourceRef:
+        kind: HelmRepository
+        name: chaos-mesh
+  values:
+    chaosDaemon:
+      runtime: containerd
+      socketPath: /run/containerd/containerd.sock
+      resources:
+        requests: { cpu: 25m, memory: 64Mi }
+    controllerManager:
+      replicaCount: 1
+      resources:
+        requests: { cpu: 25m, memory: 64Mi }
+    dashboard:
+      create: false
+    dnsServer:
+      create: false
