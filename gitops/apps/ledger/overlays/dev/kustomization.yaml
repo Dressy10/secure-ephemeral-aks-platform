@@ -7,4 +7,4 @@ images:
   - name: ledger
     newName: ghcr.io/dressy10/ledger
     # Rewritten by .github/workflows/build.yml after each signed build. Never edit by hand.
-    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    digest: sha256:566d0bc6010085fa9bf5747a1e6930c9f7a610e548b33252610dbb67af5089f4
