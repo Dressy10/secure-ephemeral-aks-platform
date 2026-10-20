@@ -1,0 +1,92 @@
+name: preview
+
+# Per-PR preview environment in the shared `previews` namespace; torn down when the PR closes.
+# Skips cleanly when the ephemeral cluster is down.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths: ["app/**", "gitops/apps/**", ".github/workflows/preview.yml"]
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PR: ${{ github.event.pull_request.number }}
+  RG: rg-idp-platform
+  CLUSTER: aks-idp-dev
+  ACR: acridp76256cec
+
+jobs:
+  deploy:
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_PREVIEW_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Is the cluster up?
+        id: up
+        run: |
+          if az aks show -g "$RG" -n "$CLUSTER" --query name -o tsv >/dev/null 2>&1; then
+            echo "up=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Cluster is down (make down); skipping preview."
+            echo "up=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build image in ACR
+        if: steps.up.outputs.up == 'true'
+        run: |
+          az acr build -r "$ACR" -t "ledger:pr-$PR-${GITHUB_SHA::8}" app/ledger
+      - name: Deploy preview
+        if: steps.up.outputs.up == 'true'
+        run: |
+          az aks get-credentials -g "$RG" -n "$CLUSTER" --overwrite-existing
+          kubelogin convert-kubeconfig -l azurecli
+          d=$(mktemp -d)
+          cat > "$d/kustomization.yaml" <<EOF
+          apiVersion: kustomize.config.k8s.io/v1beta1
+          kind: Kustomization
+          namespace: previews
+          namePrefix: pr-$PR-
+          labels:
+            - pairs: { preview: "pr-$PR" }
+              includeSelectors: true
+          resources:
+            - $GITHUB_WORKSPACE/gitops/apps/ledger/base
+          images:
+            - name: ledger
+              newName: $ACR.azurecr.io/ledger
+              newTag: pr-$PR-${GITHUB_SHA::8}
+          EOF
+          kubectl apply -k "$d"
+          kubectl -n previews rollout status "deploy/pr-$PR-ledger" --timeout=180s
+      - name: Smoke test
+        if: steps.up.outputs.up == 'true'
+        run: |
+          kubectl -n previews run "smoke-$PR" --rm -i --restart=Never --image=curlimages/curl:8.10.1 \
+            --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":100,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"smoke","image":"curlimages/curl:8.10.1","args":["-fsS","http://pr-'"$PR"'-ledger/healthz"],"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}'
+
+  teardown:
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_PREVIEW_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Delete preview resources
+        run: |
+          az aks show -g "$RG" -n "$CLUSTER" --query name -o tsv >/dev/null 2>&1 || { echo "Cluster down; nothing to delete."; exit 0; }
+          az aks get-credentials -g "$RG" -n "$CLUSTER" --overwrite-existing
+          kubelogin convert-kubeconfig -l azurecli
+          kubectl -n previews delete deploy,svc -l "preview=pr-$PR" --ignore-not-found

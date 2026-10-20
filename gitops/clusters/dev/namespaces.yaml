@@ -9,6 +9,14 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
+  name: previews
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    app.kubernetes.io/part-of: idp-platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
   name: observability
   labels:
     app.kubernetes.io/part-of: idp-platform
