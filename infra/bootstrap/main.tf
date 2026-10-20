@@ -27,6 +27,11 @@ variable "github_repo" {
   description = "owner/name of the GitHub repo allowed to authenticate"
   type        = string
 }
+variable "github_subject_prefix" {
+  description = "OIDC subject prefix. Immutable form: repo:<owner>@<owner_id>/<repo>@<repo_id> (gh api repos/<o>/<r>/actions/oidc/customization/sub). Defaults to the mutable repo:<owner>/<repo>."
+  type        = string
+  default     = null
+}
 variable "tags" {
   type = map(string)
   default = {
@@ -81,13 +86,15 @@ resource "azurerm_storage_container" "state" {
 #   plan  -> Reader + state access, trusted for pull_request and main
 #   apply -> Contributor + Resource Policy Contributor, trusted only for the `production` environment
 locals {
+  subject_prefix = coalesce(var.github_subject_prefix, "repo:${var.github_repo}")
+
   identities = {
     plan = {
-      subjects = ["repo:${var.github_repo}:pull_request", "repo:${var.github_repo}:ref:refs/heads/main"]
+      subjects = ["${local.subject_prefix}:pull_request", "${local.subject_prefix}:ref:refs/heads/main"]
       roles    = ["Reader"]
     }
     apply = {
-      subjects = ["repo:${var.github_repo}:environment:production"]
+      subjects = ["${local.subject_prefix}:environment:production"]
       roles    = ["Contributor", "Resource Policy Contributor"]
     }
   }
