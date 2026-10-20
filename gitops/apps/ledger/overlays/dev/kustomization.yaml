@@ -3,6 +3,9 @@ kind: Kustomization
 namespace: payments
 resources:
   - ../../base
+  - rollout.yaml
+patches:
+  - path: faults.yaml
 images:
   - name: ledger
     newName: ghcr.io/dressy10/ledger

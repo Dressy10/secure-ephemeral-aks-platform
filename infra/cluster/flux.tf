@@ -32,6 +32,8 @@ resource "azurerm_kubernetes_flux_configuration" "platform" {
   kustomizations {
     name                       = "infra"
     path                       = "./gitops/infrastructure"
+    wait                       = true # HelmReleases (Kyverno, Rollouts, Prometheus) must be healthy first
+    timeout_in_seconds         = 900
     sync_interval_in_seconds   = 60
     garbage_collection_enabled = true
   }

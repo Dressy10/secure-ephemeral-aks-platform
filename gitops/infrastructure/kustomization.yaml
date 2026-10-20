@@ -3,3 +3,6 @@ kind: Kustomization
 resources:
   - namespaces.yaml
   - kyverno.yaml
+  - argo-rollouts.yaml
+  - prometheus.yaml
+  - loadgen.yaml

@@ -25,6 +25,11 @@ variable "node_vm_size" {
   type        = string
   default     = "Standard_B2s"
 }
+variable "node_count" {
+  description = "Two small nodes: Kyverno, Rollouts, Prometheus and Flux need more CPU requests than one B2s offers."
+  type        = number
+  default     = 2
+}
 variable "tags" {
   type = map(string)
   default = {
@@ -73,7 +78,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
   default_node_pool {
     name                 = "system"
     vm_size              = var.node_vm_size
-    node_count           = 1
+    node_count           = var.node_count
     os_disk_size_gb      = 32
     os_disk_type         = "Managed"
     auto_scaling_enabled = false
