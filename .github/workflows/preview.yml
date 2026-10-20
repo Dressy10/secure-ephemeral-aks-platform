@@ -42,10 +42,14 @@ jobs:
             echo "::notice::Cluster is down (make down); skipping preview."
             echo "up=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Build image in ACR
+      - name: Build and push image
         if: steps.up.outputs.up == 'true'
         run: |
-          az acr build -r "$ACR" -t "ledger:pr-$PR-${GITHUB_SHA::8}" app/ledger
+          # Build on the runner and push with AcrPush; `az acr build` would need ACR Tasks rights.
+          az acr login -n "$ACR"
+          img="$ACR.azurecr.io/ledger:pr-$PR-${GITHUB_SHA::8}"
+          docker build -t "$img" app/ledger
+          docker push "$img"
       - name: Deploy preview
         if: steps.up.outputs.up == 'true'
         run: |
