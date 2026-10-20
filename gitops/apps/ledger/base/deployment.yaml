@@ -53,7 +53,7 @@ kind: Service
 metadata:
   name: ledger
   labels:
-    flux-latency-probe: "t153643"
+    flux-latency-probe: "t161001"
     app.kubernetes.io/name: ledger
 spec:
   selector:
