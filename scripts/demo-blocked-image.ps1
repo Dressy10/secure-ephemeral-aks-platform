@@ -1,14 +1,36 @@
-# Demo: admission control rejects an unsigned/foreign image in the payments namespace.
-# Requires the cluster to be up (scripts\up.ps1) and Kyverno + policies synced.
+# Demo: admission control rejects images that are not signed by our build workflow.
+# Requires the cluster up and Kyverno + policies synced, and ledger:unsigned-demo pushed
+# (run the `demo-unsigned` workflow once: gh workflow run demo-unsigned).
 $ErrorActionPreference = "Continue"
 
-"--- 1. Deploying an UNSIGNED image (docker.io/library/nginx:1.14, old and unverified) to payments ..."
-kubectl -n payments run unsigned-demo --image=docker.io/library/nginx:1.14 --restart=Never 2>&1 | Tee-Object -Variable out
-if ($out -match "denied|blocked|admission webhook") { "`nBLOCKED by admission control, as expected." } else { Write-Warning "Not blocked: check the policy." }
+# Pod specs that satisfy PodSecurity "restricted", so rejection can only come from Kyverno.
+function New-PodJson($name, $image) {
+    @{
+        apiVersion = "v1"; kind = "Pod"; metadata = @{ name = $name; namespace = "payments" }
+        spec = @{
+            restartPolicy = "Never"
+            securityContext = @{ runAsNonRoot = $true; runAsUser = 65532; seccompProfile = @{ type = "RuntimeDefault" } }
+            containers = @(@{
+                name = "c"; image = $image
+                securityContext = @{ allowPrivilegeEscalation = $false; capabilities = @{ drop = @("ALL") } }
+            })
+        }
+    } | ConvertTo-Json -Depth 8 -Compress
+}
 
-"`n--- 2. Same namespace, a lookalike under our registry path but never signed by our workflow ..."
-kubectl -n payments run lookalike-demo --image=ghcr.io/dressy10/ledger:not-signed --restart=Never 2>&1 | Tee-Object -Variable out2
-if ($out2 -match "denied|blocked|admission webhook|no signatures|verification") { "`nBLOCKED by signature verification, as expected." } else { Write-Warning "Not blocked: check the policy." }
+function Try-Deploy($title, $name, $image, $expect) {
+    "`n--- $title"
+    "    image: $image"
+    $json = New-PodJson $name $image
+    $out = $json | kubectl apply -f - 2>&1 | Out-String
+    $out.Trim()
+    if ($out -match "admission webhook .* denied" -and $out -match $expect) { "RESULT: BLOCKED by Kyverno, as expected." }
+    elseif ($out -match "created") { Write-Warning "RESULT: the pod was ALLOWED. Check the policy."; kubectl -n payments delete pod $name --ignore-not-found | Out-Null }
+    else { Write-Warning "RESULT: rejected, but not by the signing policy as expected." }
+}
+
+Try-Deploy "1. Foreign image (not from our registry)" "foreign-demo" "docker.io/library/nginx:1.27" "ledger|registry|dressy10"
+Try-Deploy "2. Real image in OUR registry path, built but never signed" "unsigned-demo" "ghcr.io/dressy10/ledger:unsigned-demo" "no signatures|signature|verify"
 
 "`n--- 3. The legitimately signed deployment is running:"
-kubectl -n payments get pods
+kubectl -n payments get pods -l app.kubernetes.io/name=ledger
