@@ -5,7 +5,6 @@ terraform {
   required_version = ">= 1.6"
   required_providers {
     azurerm = { source = "hashicorp/azurerm", version = "~> 4.0" }
-    random  = { source = "hashicorp/random", version = "~> 3.6" }
   }
   backend "azurerm" {}
 }
@@ -35,12 +34,6 @@ variable "tags" {
   }
 }
 
-resource "random_string" "acr" {
-  length  = 5
-  upper   = false
-  special = false
-}
-
 resource "azurerm_resource_group" "platform" {
   name     = "rg-idp-platform"
   location = var.location
@@ -49,7 +42,8 @@ resource "azurerm_resource_group" "platform" {
 
 # ACR Basic ~ $5/month. It persists across cluster cycles in a real setup; here it is cheap enough to cycle too.
 resource "azurerm_container_registry" "acr" {
-  name                          = "acridp${random_string.acr.result}"
+  # Deterministic, so image references in gitops/ survive down/up cycles.
+  name                          = "acridp${substr(md5(var.subscription_id), 0, 8)}"
   resource_group_name           = azurerm_resource_group.platform.name
   location                      = azurerm_resource_group.platform.location
   sku                           = "Basic"

@@ -92,10 +92,20 @@ locals {
     plan = {
       subjects = ["${local.subject_prefix}:pull_request", "${local.subject_prefix}:ref:refs/heads/main"]
       roles    = ["Reader"]
+
+      state_access = true
     }
     apply = {
       subjects = ["${local.subject_prefix}:environment:production"]
       roles    = ["Contributor", "Resource Policy Contributor"]
+
+      state_access = true
+    }
+    # Preview deploys: no subscription roles and no state access. Scoped roles are granted in infra/cluster.
+    preview = {
+      subjects     = ["${local.subject_prefix}:pull_request"]
+      roles        = []
+      state_access = false
     }
   }
 
@@ -138,9 +148,9 @@ resource "azurerm_role_assignment" "sub" {
   principal_id         = azuread_service_principal.gh[each.value.id].object_id
 }
 
-# Both identities need the data-plane role to read/write/lock Terraform state.
+# plan and apply need the data-plane role to read/write/lock Terraform state. preview does not.
 resource "azurerm_role_assignment" "state" {
-  for_each             = local.identities
+  for_each             = { for k, v in local.identities : k => v if v.state_access }
   scope                = azurerm_storage_account.state.id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azuread_service_principal.gh[each.key].object_id
@@ -150,6 +160,8 @@ output "tenant_id" { value = data.azurerm_subscription.current.tenant_id }
 output "subscription_id" { value = var.subscription_id }
 output "plan_client_id" { value = azuread_application.gh["plan"].client_id }
 output "apply_client_id" { value = azuread_application.gh["apply"].client_id }
+output "preview_client_id" { value = azuread_application.gh["preview"].client_id }
+output "preview_object_id" { value = azuread_service_principal.gh["preview"].object_id }
 output "backend_config" {
   value = <<-EOT
     resource_group_name  = "${azurerm_resource_group.state.name}"
