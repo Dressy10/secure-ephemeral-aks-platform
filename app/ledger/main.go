@@ -9,8 +9,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand/v2"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -24,11 +27,11 @@ type transfer struct {
 }
 
 type ledger struct {
-	mu        sync.Mutex
-	balances  map[string]int64
-	seen      map[string]bool // idempotency by ref
-	prevHash  string
-	auditOut  *log.Logger
+	mu       sync.Mutex
+	balances map[string]int64
+	seen     map[string]bool // idempotency by ref
+	prevHash string
+	auditOut *log.Logger
 }
 
 func newLedger() *ledger {
@@ -112,6 +115,30 @@ func instrument(next http.Handler) http.Handler {
 	})
 }
 
+// failRate reads FAIL_RATE (0..1). It exists so a deliberately bad release can be shipped
+// through the canary to demonstrate automated rollback. It never affects health or metrics.
+func failRate() float64 {
+	f, err := strconv.ParseFloat(os.Getenv("FAIL_RATE"), 64)
+	if err != nil || f < 0 || f > 1 {
+		return 0
+	}
+	return f
+}
+
+func faulty(next http.Handler, rate float64) http.Handler {
+	if rate == 0 {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		api := strings.HasPrefix(r.URL.Path, "/transfers") || strings.HasPrefix(r.URL.Path, "/accounts")
+		if api && rand.Float64() < rate {
+			http.Error(w, "injected fault", http.StatusInternalServerError)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func metrics(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 	for _, c := range []string{"2xx", "4xx", "5xx"} {
@@ -160,7 +187,7 @@ func main() {
 	addr := ":8080"
 	log.Printf("ledger listening on %s", addr)
 	log.Fatal((&http.Server{
-		Addr: addr, Handler: instrument(mux),
+		Addr: addr, Handler: instrument(faulty(mux, failRate())),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second,
 	}).ListenAndServe())
 }

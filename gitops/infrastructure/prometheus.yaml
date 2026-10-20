@@ -1,0 +1,82 @@
+# Minimal in-cluster Prometheus: server only, in memory, short retention. It scrapes pods that carry
+# prometheus.io/scrape annotations, evaluates the ledger SLO burn-rate alerts, and serves Argo
+# Rollouts' canary analysis. Grafana/Loki/Alertmanager are intentionally omitted to fit the budget
+# (see docs/adr/0004-observability-footprint.md).
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: prometheus-community
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://prometheus-community.github.io/helm-charts
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: prometheus
+  namespace: flux-system
+spec:
+  interval: 10m
+  releaseName: prometheus
+  targetNamespace: observability
+  chart:
+    spec:
+      chart: prometheus
+      version: 27.9.0
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-community
+  values:
+    alertmanager: { enabled: false }
+    kube-state-metrics: { enabled: false }
+    prometheus-node-exporter: { enabled: false }
+    prometheus-pushgateway: { enabled: false }
+    server:
+      global:
+        scrape_interval: 15s
+        evaluation_interval: 15s
+      retention: 12h
+      persistentVolume: { enabled: false }
+      resources:
+        requests: { cpu: 50m, memory: 256Mi }
+        limits: { memory: 512Mi }
+    serverFiles:
+      alerting_rules.yml:
+        groups:
+          - name: ledger-slo
+            rules:
+              # SLO: 99.9% of requests succeed (non-5xx) over 30 days => error budget 0.1%.
+              - record: ledger:error_ratio:rate5m
+                expr: sum(rate(ledger_http_requests_total{code="5xx"}[5m])) / sum(rate(ledger_http_requests_total[5m]))
+              - record: ledger:error_ratio:rate1h
+                expr: sum(rate(ledger_http_requests_total{code="5xx"}[1h])) / sum(rate(ledger_http_requests_total[1h]))
+              - record: ledger:error_ratio:rate30m
+                expr: sum(rate(ledger_http_requests_total{code="5xx"}[30m])) / sum(rate(ledger_http_requests_total[30m]))
+              - record: ledger:error_ratio:rate6h
+                expr: sum(rate(ledger_http_requests_total{code="5xx"}[6h])) / sum(rate(ledger_http_requests_total[6h]))
+              # Fast burn: 14.4x budget consumption (2% of the monthly budget in 1h). Page.
+              - alert: LedgerErrorBudgetFastBurn
+                expr: ledger:error_ratio:rate1h > (14.4 * 0.001) and ledger:error_ratio:rate5m > (14.4 * 0.001)
+                for: 2m
+                labels: { severity: page }
+                annotations:
+                  summary: "Ledger is burning its 30d error budget at >14.4x"
+                  runbook: docs/runbooks/ledger-slo-burn.md
+              # Slow burn: 6x over 6h (5% of the monthly budget). Ticket.
+              - alert: LedgerErrorBudgetSlowBurn
+                expr: ledger:error_ratio:rate6h > (6 * 0.001) and ledger:error_ratio:rate30m > (6 * 0.001)
+                for: 15m
+                labels: { severity: ticket }
+                annotations:
+                  summary: "Ledger is burning its 30d error budget at >6x"
+                  runbook: docs/runbooks/ledger-slo-burn.md
+              # Latency SLO: 99% of requests under 250ms.
+              - alert: LedgerLatencySLOBreach
+                expr: |
+                  1 - (sum(rate(ledger_http_request_duration_seconds_bucket{le="0.25"}[5m]))
+                       / sum(rate(ledger_http_request_duration_seconds_count[5m]))) > 0.01
+                for: 10m
+                labels: { severity: ticket }
+                annotations:
+                  summary: "More than 1% of ledger requests exceed 250ms"

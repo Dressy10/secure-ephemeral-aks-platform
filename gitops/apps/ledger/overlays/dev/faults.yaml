@@ -1,0 +1,14 @@
+# Fault-injection knob for the rollback demo (scripts/demo-rollback.ps1). Keep "0" in main.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger
+spec:
+  replicas: 0 # the Rollout owns the pods in dev
+  template:
+    spec:
+      containers:
+        - name: ledger
+          env:
+            - name: FAIL_RATE
+              value: "0"

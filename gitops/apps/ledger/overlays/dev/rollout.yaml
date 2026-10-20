@@ -1,0 +1,54 @@
+# Progressive delivery for dev. The Rollout borrows the pod template from the `ledger` Deployment
+# (workloadRef), so the base stays a plain Deployment (previews use it as-is) and the dev overlay
+# only scales that Deployment to 0 and lets the Rollout own the pods.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: ledger
+spec:
+  replicas: 3
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ledger
+  workloadRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ledger
+    scaleDown: onsuccess
+  strategy:
+    canary:
+      # No traffic router on this cluster: weights are approximated by replica ratio (1 of 3, then 2 of 3).
+      steps:
+        - setWeight: 34
+        - analysis:
+            templates:
+              - templateName: ledger-success-rate
+            args:
+              - name: canary-hash
+                valueFrom:
+                  podTemplateHashValue: Latest
+        - setWeight: 67
+        - pause: { duration: 30s }
+---
+# Roll back automatically when the canary's own success rate (non-5xx) drops below 99%.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: ledger-success-rate
+spec:
+  args:
+    - name: canary-hash
+  metrics:
+    - name: success-rate
+      interval: 20s
+      count: 4
+      failureLimit: 1
+      successCondition: result[0] >= 0.99
+      provider:
+        prometheus:
+          address: http://prometheus-server.observability.svc
+          query: |
+            sum(rate(ledger_http_requests_total{code!="5xx",rollouts_pod_template_hash="{{args.canary-hash}}"}[1m]))
+            /
+            sum(rate(ledger_http_requests_total{rollouts_pod_template_hash="{{args.canary-hash}}"}[1m]))
