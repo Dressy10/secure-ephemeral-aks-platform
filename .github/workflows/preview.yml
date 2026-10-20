@@ -53,6 +53,7 @@ jobs:
       - name: Deploy preview
         if: steps.up.outputs.up == 'true'
         run: |
+          sudo az aks install-cli
           az aks get-credentials -g "$RG" -n "$CLUSTER" --overwrite-existing
           kubelogin convert-kubeconfig -l azurecli
           d=$(mktemp -d)
@@ -91,6 +92,7 @@ jobs:
       - name: Delete preview resources
         run: |
           az aks show -g "$RG" -n "$CLUSTER" --query name -o tsv >/dev/null 2>&1 || { echo "Cluster down; nothing to delete."; exit 0; }
+          sudo az aks install-cli
           az aks get-credentials -g "$RG" -n "$CLUSTER" --overwrite-existing
           kubelogin convert-kubeconfig -l azurecli
           kubectl -n previews delete deploy,svc -l "preview=pr-$PR" --ignore-not-found
