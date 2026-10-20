@@ -24,9 +24,13 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - |
+              # One log line per request: "<unix-seconds> <http-code> <seconds>". 000 = no connection.
+              # The game-day script derives availability, latency and MTTR from these lines, i.e. from
+              # the client's point of view (the app's own metrics go blind when every pod is down).
               while true; do
-                curl -s -o /dev/null -X POST http://ledger.payments.svc/transfers \
-                  -d "{\"from\":\"acct-treasury\",\"to\":\"acct-a\",\"amount_minor\":1,\"ref\":\"lg-$(date +%s%N)\"}"
+                echo "$(date +%s) $(curl -s -o /dev/null --max-time 2 -w '%{http_code} %{time_total}' \
+                  -X POST http://ledger.payments.svc/transfers \
+                  -d "{\"from\":\"acct-treasury\",\"to\":\"acct-a\",\"amount_minor\":1,\"ref\":\"lg-$(date +%s%N)\"}")"
                 sleep 0.2
               done
           resources:

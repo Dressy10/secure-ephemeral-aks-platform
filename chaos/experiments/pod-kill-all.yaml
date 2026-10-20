@@ -1,0 +1,15 @@
+# Experiment 2: kill ALL ledger pods at once (worst case for a single service).
+# Hypothesis: a short, bounded outage; service recovers on its own within 60 seconds with no human action.
+# This also exercises Kyverno: every replacement pod must pass signature verification at admission.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: kill-all-ledger-pods
+  namespace: payments
+spec:
+  action: pod-kill
+  mode: all
+  selector:
+    namespaces: [payments]
+    labelSelectors:
+      app.kubernetes.io/name: ledger
