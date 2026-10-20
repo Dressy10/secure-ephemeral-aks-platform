@@ -36,3 +36,7 @@ terraform apply -var subscription_id=<sub> -var github_repo=<owner>/<repo>
 ```
 
 Then copy the outputs into GitHub repo variables: `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_PLAN_CLIENT_ID`, `AZURE_APPLY_CLIENT_ID`, `TFSTATE_RG`, `TFSTATE_SA`, `BUDGET_CONTACTS`.
+
+### OIDC subject
+
+New GitHub repos use an immutable, ID-based OIDC subject (renaming or transferring the repo cannot hijack the identity). Fetch it with `gh api repos/<owner>/<repo>/actions/oidc/customization/sub` and pass it as `-var github_subject_prefix=<sub_claim_prefix>` when applying the bootstrap.
