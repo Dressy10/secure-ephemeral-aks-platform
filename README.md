@@ -6,8 +6,8 @@ A small platform a team could use to ship a service safely. Security, reliabilit
 
 | Phase | Scope | State |
 |---|---|---|
-| 1 | Remote state, GitHub OIDC, Azure Policy, $50 budget, Infracost in PRs | scaffolded, not yet applied |
-| 2 | Ephemeral compute, GitOps, PR preview environments | not started |
+| 1 | Remote state, GitHub OIDC, Azure Policy, $50 budget, Infracost in PRs | done and applied |
+| 2 | Ephemeral compute, GitOps, PR preview environments | done (verified end to end) |
 | 3 | Supply-chain signing, admission control, SLOs, canary | not started |
 | 4 | Chaos game day, postmortem, demo | not started |
 
@@ -16,8 +16,8 @@ A small platform a team could use to ship a service safely. Security, reliabilit
 | Metric | Value |
 |---|---|
 | Long-lived secrets stored in Azure or GitHub | 0 Azure credentials (1 Infracost pricing key) |
-| Cost per environment | TBD |
-| Deploy time | TBD |
+| Cost per environment | ~| Cost per environment | TBD |.10/hour for the cluster while up (estimate, to be verified in the pricing calculator) |
+| Cluster create time (AKS + ACR) | ~10 min (606 s); with Flux ~22 min (1,320 s) |
 | MTTR in chaos test | TBD |
 
 ## Layout
