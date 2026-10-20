@@ -5,5 +5,6 @@ resources:
   - ../../base
 images:
   - name: ledger
-    newName: acridp76256cec.azurecr.io/ledger
-    newTag: dev
+    newName: ghcr.io/dressy10/ledger
+    # Rewritten by .github/workflows/build.yml after each signed build. Never edit by hand.
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
