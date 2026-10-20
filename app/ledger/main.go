@@ -164,3 +164,5 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second,
 	}).ListenAndServe())
 }
+
+// preview smoke test
