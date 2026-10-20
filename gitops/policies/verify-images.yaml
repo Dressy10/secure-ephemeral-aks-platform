@@ -1,0 +1,47 @@
+# Admission control for the payments namespace:
+#  1. Only images from our GHCR path may run.
+#  2. Those images must carry a Cosign signature made by THIS repo's build workflow on main
+#     (keyless: verified against Sigstore's transparency log and the GitHub OIDC identity).
+# An unsigned or foreign image is rejected at admission.
+# SLSA provenance is attested by the same workflow and checked with `gh attestation verify`
+# (see docs/runbooks/verify-supply-chain.md); Kyverno 1.13 does not read GitHub's bundle format.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-signed-ledger-images
+spec:
+  validationFailureAction: Enforce
+  background: false
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: only-our-registry
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [payments]
+      validate:
+        message: "Images in payments must come from ghcr.io/dressy10/ledger."
+        pattern:
+          spec:
+            containers:
+              - image: "ghcr.io/dressy10/ledger@sha256:* | ghcr.io/dressy10/ledger:*"
+    - name: verify-signature-and-provenance
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [payments]
+      verifyImages:
+        - imageReferences:
+            - "ghcr.io/dressy10/ledger*"
+          mutateDigest: true
+          verifyDigest: true
+          required: true
+          attestors:
+            - entries:
+                - keyless:
+                    issuer: https://token.actions.githubusercontent.com
+                    subject: https://github.com/Dressy10/secure-ephemeral-aks-platform/.github/workflows/build.yml@refs/heads/main
+                    rekor:
+                      url: https://rekor.sigstore.dev

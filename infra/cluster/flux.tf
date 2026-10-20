@@ -28,9 +28,26 @@ resource "azurerm_kubernetes_flux_configuration" "platform" {
     sync_interval_in_seconds = 60
   }
 
+  # Ordered: Kyverno (CRDs + webhook) must exist before policies, and policies before workloads.
   kustomizations {
     name                       = "infra"
-    path                       = "./gitops/clusters/dev"
+    path                       = "./gitops/infrastructure"
+    sync_interval_in_seconds   = 60
+    garbage_collection_enabled = true
+  }
+
+  kustomizations {
+    name                       = "policies"
+    path                       = "./gitops/policies"
+    depends_on                 = ["infra"]
+    sync_interval_in_seconds   = 60
+    garbage_collection_enabled = true
+  }
+
+  kustomizations {
+    name                       = "apps"
+    path                       = "./gitops/apps/ledger/overlays/dev"
+    depends_on                 = ["policies"]
     sync_interval_in_seconds   = 60
     garbage_collection_enabled = true
   }
