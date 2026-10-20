@@ -8,17 +8,25 @@ A small platform a team could use to ship a service safely. Security, reliabilit
 |---|---|---|
 | 1 | Remote state, GitHub OIDC, Azure Policy, $50 budget, Infracost in PRs | done and applied |
 | 2 | Ephemeral compute, GitOps, PR preview environments | done (verified end to end) |
-| 3 | Supply-chain signing, admission control, SLOs, canary | not started |
+| 3 | Supply-chain signing, admission control, SLOs, canary | done (verified on a live cluster) |
 | 4 | Chaos game day, postmortem, demo | not started |
 
-## Measured results (filled in as they are measured)
+## Measured results
+
+All figures come from real runs. Dollar figures are my own estimates from list prices, not billed amounts.
 
 | Metric | Value |
 |---|---|
-| Long-lived secrets stored in Azure or GitHub | 0 Azure credentials (1 Infracost pricing key) |
-| Cost per environment | ~| Cost per environment | TBD |.10/hour for the cluster while up (estimate, to be verified in the pricing calculator) |
-| Cluster create time (AKS + ACR) | ~10 min (606 s); with Flux ~22 min (1,320 s) |
-| MTTR in chaos test | TBD |
+| Long-lived secrets stored in Azure or GitHub | 0 Azure credentials. 1 Infracost pricing key (no cloud access). |
+| Cluster create time, 1 node + Flux | 1,320 s (22 min) |
+| Cluster create time, 2 nodes + Flux + Kyverno + Rollouts + Prometheus | 1,003 s (17 min) |
+| Cluster destroy time | 1,068 s (18 min) |
+| Cost while the cluster is up | about $0.15 per hour (2 x Standard_B2s, load balancer, ACR Basic) |
+| Image signature enforcement | unsigned or foreign images rejected at admission (see `scripts/demo-blocked-image.ps1`) |
+| Bad release: canary analysis to automatic rollback | about 40 s (analysis failed twice against a limit of one) |
+| Bad release: push to rollback, end to end | 628 s, of which about 590 s was Flux not yet starting the rollout (cause not yet identified) |
+| Vulnerabilities blocked at build | 25 HIGH or CRITICAL (Go stdlib) caught by the Trivy gate on the first real scan, fixed by upgrading the toolchain |
+| MTTR in chaos test | TBD (Phase 4) |
 
 ## Layout
 
