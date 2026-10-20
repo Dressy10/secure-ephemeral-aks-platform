@@ -56,7 +56,8 @@ jobs:
           sudo az aks install-cli
           az aks get-credentials -g "$RG" -n "$CLUSTER" --overwrite-existing
           kubelogin convert-kubeconfig -l azurecli
-          d=$(mktemp -d)
+          d="$GITHUB_WORKSPACE/.preview"
+          mkdir -p "$d"
           cat > "$d/kustomization.yaml" <<EOF
           apiVersion: kustomize.config.k8s.io/v1beta1
           kind: Kustomization
@@ -66,7 +67,7 @@ jobs:
             - pairs: { preview: "pr-$PR" }
               includeSelectors: true
           resources:
-            - $GITHUB_WORKSPACE/gitops/apps/ledger/base
+            - ../gitops/apps/ledger/base
           images:
             - name: ledger
               newName: $ACR.azurecr.io/ledger
