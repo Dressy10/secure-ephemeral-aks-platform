@@ -36,5 +36,3 @@ terraform apply -var subscription_id=<sub> -var github_repo=<owner>/<repo>
 ```
 
 Then copy the outputs into GitHub repo variables: `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_PLAN_CLIENT_ID`, `AZURE_APPLY_CLIENT_ID`, `TFSTATE_RG`, `TFSTATE_SA`, `BUDGET_CONTACTS`.
-
-<!-- oidc smoke test -->
