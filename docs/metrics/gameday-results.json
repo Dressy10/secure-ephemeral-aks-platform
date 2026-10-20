@@ -1,46 +1,48 @@
 {
-  "run": "2026-10-20, 2 x Standard_B2s, ledger 3 replicas via Argo Rollouts, ~5 req/s closed-loop client from the loadgen pod",
-  "method": "Fault times taken from cluster events (pod Killing, Chaos Mesh Applied/Recovered), not from when the experiment was submitted. Client-side request log from the loadgen pod.",
+  "run": "2026-10-20, 2 x Standard_B2s, ledger 3 replicas via Argo Rollouts, closed-loop client at about 2.5 requests/s from the loadgen pod",
+  "method": "Fault windows from cluster events (pod Killing, Chaos Mesh Applied/Recovered). Client-side request log from the loadgen pod. Every failure count below was cross-checked against the raw loadgen log.",
   "experiments": [
     {
       "name": "pod-kill-one",
-      "injection_lag_seconds": 23,
-      "requests_in_window": 122,
-      "failed_requests": 1,
-      "failure_kind": "connection refused/reset (code 000)",
-      "outage_seconds": 1,
+      "runs": 2,
+      "failed_requests": "1 (run 1), 0 (run 2)",
+      "requests_in_45s_window": "about 110-120",
+      "outage_seconds": "1 or less",
+      "injection_lag_seconds": "19-23",
       "hypothesis": "client error rate under 1%",
-      "verdict": "confirmed (1 of 122 requests in the 45 s window around the kill)"
+      "verdict": "confirmed in both runs"
     },
     {
       "name": "pod-kill-all",
-      "injection_lag_seconds": 28,
-      "requests_in_window": 120,
-      "failed_requests": 5,
-      "failure_kind": "connection refused/reset (code 000)",
-      "outage_seconds": 3,
-      "mttr_seconds": 3,
-      "hypothesis": "service recovers unaided within 60 seconds",
-      "verdict": "confirmed, with a large margin: replacement pods started 2 s after the kill, and each passed Kyverno signature verification at admission"
+      "runs": 3,
+      "failed_requests": "5 (run 1), 6 (run 2, raw log), 7 (run 3)",
+      "failed_share_of_window_pct": "about 4-6",
+      "outage_seconds": "about 3 in every run",
+      "injection_lag_seconds": "20-28",
+      "failure_kind": "connection refused (code 000): no ready endpoints for about 3 s",
+      "hypothesis": "recovers unaided within 60 seconds",
+      "verdict": "confirmed with a large margin; replacement pods started about 2 s after the kill and passed Kyverno signature verification"
     },
     {
       "name": "latency-400ms",
-      "injection_lag_seconds": 18,
-      "fault_active_seconds": 88,
-      "requests_in_fault_window": 80,
+      "runs": 2,
+      "fault_active_seconds": "88-89",
       "failed_requests": 0,
-      "p50_ms": 810,
-      "p99_ms": 1522,
       "share_over_250ms_pct": 100,
+      "p50_ms": "809-810",
+      "p99_ms": "1008-1522",
       "request_rate_during_fault_per_s": 0.9,
-      "request_rate_baseline_per_s": 5,
+      "baseline_request_rate_per_s": "2.4-2.6",
+      "throughput_drop_pct": "about 63",
       "hypothesis": "requests succeed but most exceed the 250 ms SLO threshold",
-      "verdict": "confirmed, and worse than predicted: every request was slow, and a closed-loop client's throughput fell about 82%. p50 is about 2x the injected delay because several packet exchanges per request are each delayed."
+      "verdict": "confirmed and worse than predicted: every request was slow and a closed-loop client's throughput fell about 63%"
     }
   ],
   "caveats": [
-    "The first version of scripts/game-day.ps1 reported MTTR of 24 s and 31 s. Those figures included Chaos Mesh's 18-28 s injection lag and were wrong. It also reported 26.5% slow requests for the latency run because it averaged fault and non-fault time and a sequential client under-samples slow periods. Corrected figures are above; the script is being fixed to use event times.",
-    "Single run, single cluster, one client. Treat these as indicative, not statistically meaningful.",
-    "The error counts are from a closed-loop client at about 5 requests per second, so one failed request corresponds to roughly 200 ms of exposure."
+    "Run 1 numbers were first reported with MTTRs of 24 s and 31 s and 26.5% slow requests. Those were wrong: the first script measured from submission time (Chaos Mesh takes 18-33 s to inject) and averaged fault and non-fault time.",
+    "An earlier draft also claimed a 5 requests/s baseline and an 82% throughput drop. The real baseline is about 2.5 requests/s, so the drop is about 63%.",
+    "The second full script run (gameday-run2-script-buggy.json) reported 0 failed requests for pod-kill-all, but the raw log shows 6 connection failures in that same fault. The cause of that script discrepancy was not found. The standalone re-run (run 3) printed its window and matched the raw log.",
+    "Two to three runs on one cluster with one client: indicative, not statistical.",
+    "Raw per-run files: gameday-run1-manual-analysis.json, gameday-run2-script-buggy.json."
   ]
 }

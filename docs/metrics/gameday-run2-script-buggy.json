@@ -1,0 +1,44 @@
+{
+    "experiments":  [
+                        {
+                            "experiment":  "pod-kill-one",
+                            "injection_lag_seconds":  19,
+                            "fault_window_seconds":  45,
+                            "requests":  108,
+                            "request_rate_per_s":  2.4,
+                            "failed":  0,
+                            "error_pct":  0,
+                            "share_over_250ms_pct":  0,
+                            "p50_ms":  6,
+                            "p99_ms":  103,
+                            "outage_seconds":  0
+                        },
+                        {
+                            "experiment":  "pod-kill-all",
+                            "injection_lag_seconds":  27,
+                            "fault_window_seconds":  45,
+                            "requests":  98,
+                            "request_rate_per_s":  2.2,
+                            "failed":  0,
+                            "error_pct":  0,
+                            "share_over_250ms_pct":  0,
+                            "p50_ms":  7,
+                            "p99_ms":  105,
+                            "outage_seconds":  0
+                        },
+                        {
+                            "experiment":  "latency-400ms",
+                            "injection_lag_seconds":  33,
+                            "fault_window_seconds":  89,
+                            "requests":  76,
+                            "request_rate_per_s":  0.9,
+                            "failed":  0,
+                            "error_pct":  0,
+                            "share_over_250ms_pct":  100,
+                            "p50_ms":  809,
+                            "p99_ms":  1008,
+                            "outage_seconds":  0
+                        }
+                    ],
+    "method":  "fault windows from cluster events; client-side request log"
+}
