@@ -1,4 +1,5 @@
-FROM golang:1.23-alpine AS build
+# Toolchain version matters: Trivy flags CVEs in the Go stdlib compiled into the binary.
+FROM golang:1.26.10-alpine AS build
 WORKDIR /src
 COPY go.mod .
 COPY main.go .
