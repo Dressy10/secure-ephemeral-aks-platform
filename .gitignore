@@ -6,3 +6,4 @@ tfplan
 *.tfvars
 !*.tfvars.example
 backend.hcl
+.claude/settings.local.json
