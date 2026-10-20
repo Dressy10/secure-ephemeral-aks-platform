@@ -1,0 +1,60 @@
+name: infra-pr
+
+on:
+  pull_request:
+    paths: ["infra/**", ".github/workflows/infra-*.yml"]
+
+permissions:
+  id-token: write # OIDC token request
+  contents: read
+  pull-requests: write # Infracost comment
+
+env:
+  ARM_USE_OIDC: "true"
+  ARM_USE_AZUREAD: "true"
+  ARM_CLIENT_ID: ${{ vars.AZURE_PLAN_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  TF_VAR_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  TF_VAR_budget_contacts: ${{ vars.BUDGET_CONTACTS }} # JSON list, e.g. ["me@example.com"]
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/landing-zone
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - run: terraform fmt -check -recursive ..
+      - run: |
+          terraform init -input=false \
+            -backend-config="resource_group_name=${{ vars.TFSTATE_RG }}" \
+            -backend-config="storage_account_name=${{ vars.TFSTATE_SA }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="use_azuread_auth=true"
+      - run: terraform validate
+      - run: terraform plan -input=false -lock-timeout=60s -out=tfplan
+
+  cost:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: head
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+      - uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }} # only non-Azure secret in the repo (free pricing-API key)
+      - run: infracost breakdown --path=base/infra --format=json --out-file=/tmp/base.json
+      - run: infracost diff --path=head/infra --compare-to=/tmp/base.json --format=json --out-file=/tmp/diff.json
+      - run: |
+          infracost comment github --path=/tmp/diff.json \
+            --repo=$GITHUB_REPOSITORY --pull-request=${{ github.event.pull_request.number }} \
+            --github-token=${{ github.token }} --behavior=update
