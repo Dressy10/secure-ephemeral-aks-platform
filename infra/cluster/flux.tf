@@ -47,9 +47,13 @@ resource "azurerm_kubernetes_flux_configuration" "platform" {
   }
 
   kustomizations {
-    name                       = "apps"
-    path                       = "./gitops/apps/ledger/overlays/dev"
-    depends_on                 = ["policies"]
+    name       = "apps"
+    path       = "./gitops/apps/ledger/overlays/dev"
+    depends_on = ["policies"]
+    # Flux's health checker cannot read Argo Rollouts' status.observedGeneration (a string, not an
+    # int), so wait=true leaves the Rollout "Unknown" until the 10 min timeout and delays every
+    # change by a retry cycle. Argo Rollouts' own analysis owns rollout health instead.
+    wait                       = false
     sync_interval_in_seconds   = 60
     garbage_collection_enabled = true
   }
