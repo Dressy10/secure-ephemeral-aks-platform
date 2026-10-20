@@ -9,7 +9,7 @@ A small platform a team could use to ship a service safely. Security, reliabilit
 | 1 | Remote state, GitHub OIDC, Azure Policy, $50 budget, Infracost in PRs | done and applied |
 | 2 | Ephemeral compute, GitOps, PR preview environments | done (verified end to end) |
 | 3 | Supply-chain signing, admission control, SLOs, canary | done (verified on a live cluster) |
-| 4 | Chaos game day, postmortem, demo | not started |
+| 4 | Chaos game day, postmortem, demo | game day and postmortem done; demo video not recorded |
 
 ## Measured results
 
@@ -23,10 +23,14 @@ All figures come from real runs. Dollar figures are my own estimates from list p
 | Cluster destroy time | 1,068 s (18 min) |
 | Cost while the cluster is up | about $0.15 per hour (2 x Standard_B2s, load balancer, ACR Basic) |
 | Image signature enforcement | unsigned or foreign images rejected at admission (see `scripts/demo-blocked-image.ps1`) |
-| Bad release: canary analysis to automatic rollback | about 40 s (analysis failed twice against a limit of one) |
-| Bad release: push to rollback, end to end | 628 s, of which about 590 s was Flux not yet starting the rollout (cause not yet identified) |
+| Bad release: push to automatic rollback, end to end | 180 s (was 628 s before the Flux fix below); canary aborted about 55 s after it began progressing |
+| Change propagation, git push to live cluster | 73 s (was 504 s: Flux health-checked the Argo Rollout, whose `observedGeneration` is a string, until a 10 min timeout) |
+| Chaos: kill 1 of 3 pods | 0 or 1 failed request, outage 1 s or less (2 runs) |
+| Chaos: kill all 3 pods, MTTR | about 3 s, self-healed, no human action (3 runs) |
+| Chaos: +400 ms latency | every request slow (p50 about 810 ms), client throughput down about 63% |
 | Vulnerabilities blocked at build | 25 HIGH or CRITICAL (Go stdlib) caught by the Trivy gate on the first real scan, fixed by upgrading the toolchain |
-| MTTR in chaos test | TBD (Phase 4) |
+
+Measurement notes: the first game-day numbers were wrong and were corrected from raw logs; the full story, plus open action items, is in [the postmortem](docs/postmortems/2026-10-20-chaos-game-day.md). Results are from 2 to 3 runs on one small cluster, so they are indicative, not statistical.
 
 ## Layout
 
