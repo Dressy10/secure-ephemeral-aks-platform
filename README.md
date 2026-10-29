@@ -18,6 +18,7 @@ All figures come from real runs. Dollar figures are my own estimates from list p
 | Metric | Value |
 |---|---|
 | Long-lived secrets stored in Azure or GitHub | 0 Azure credentials. 1 Infracost pricing key (no cloud access). |
+| PR checks (Terraform plan + Infracost cost comment) | verified on a real pull request: plan succeeded and the Infracost report was posted as a PR comment |
 | Cluster create time, 1 node + Flux | 1,320 s (22 min) |
 | Cluster create time, 2 nodes + Flux + Kyverno + Rollouts + Prometheus | 1,003 s (17 min) |
 | Cluster destroy time | 1,068 s (18 min) |
