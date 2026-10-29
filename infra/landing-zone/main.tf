@@ -128,3 +128,5 @@ resource "azurerm_consumption_budget_subscription" "main" {
     ignore_changes = [time_period] # start_date is derived from timestamp(); don't churn the plan
   }
 }
+
+# infracost / plan CI check
